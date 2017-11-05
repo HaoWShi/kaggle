@@ -1,0 +1,473 @@
+
+# coding: utf-8
+
+# In[161]:
+
+
+#invite people for the Kaggle party
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+from scipy.stats import norm
+from sklearn.preprocessing import StandardScaler
+from scipy import stats
+import warnings
+from sklearn.model_selection import train_test_split
+from sklearn import preprocessing
+from sklearn.pipeline import make_pipeline
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import GridSearchCV,cross_val_score
+from sklearn.metrics import mean_squared_error,r2_score,mean_squared_log_error,make_scorer
+from sklearn.externals import joblib
+warnings.filterwarnings('ignore')
+get_ipython().magic('matplotlib inline')
+
+
+# In[2]:
+
+
+#import data
+ori_data = pd.read_csv("train.csv")
+
+
+# In[3]:
+
+
+#get the related coef
+corr_matrix1 = ori_data.corr()
+corrnums = corr_matrix1['SalePrice'].sort_values(ascending = False)
+
+
+# In[4]:
+
+
+from sklearn.preprocessing import LabelEncoder
+encoder = LabelEncoder()
+data_SC = ori_data["SaleCondition"]
+data_SC_encoded = encoder.fit_transform(data_SC)
+print(encoder.classes_)
+
+
+# In[5]:
+
+
+#text attributes transform into number attributes
+cols_text = ["MSZoning","Street","LotShape","LandContour","Utilities","LotConfig","LandSlope","Neighborhood","Condition2","BldgType","RoofStyle","Exterior1st","ExterCond","Foundation","BsmtFinType2","HeatingQC","Electrical","KitchenQual","PavedDrive","SaleType","SaleCondition"]
+
+
+# In[6]:
+
+
+#missing data
+total = ori_data.isnull().sum().sort_values(ascending=False)
+percent = (ori_data.isnull().sum()/ori_data.isnull().count()).sort_values(ascending=False)
+missing_data = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
+missing_data.head(20)
+
+
+# # from sklearn.preprocessing import LabelEncoder
+# encoder = LabelEncoder()
+# data_SC = ori_data["SaleCondition"]
+# data_SC_encoded = encoder.fit_transform(data_SC)
+# print(encoder.classes_)
+# cols_text = ["MSZoning","Street","LotShape","LandContour","Utilities","LotConfig","LandSlope","Neighborhood","Condition2","BldgType","RoofStyle","Exterior1st","ExterCond","Foundation","BsmtFinType2","HeatingQC","Electrical","KitchenQual","PavedDrive","SaleType","SaleCondition"]
+
+# In[7]:
+
+
+#encoder = LabelEncoder()
+#data_SC = ori_data["SaleCondition"]
+#data_SC_encoded = encoder.fit_transform(data_SC)
+
+
+# In[8]:
+
+
+data = ori_data.drop(ori_data.loc[ori_data['Electrical'].isnull()].index)
+
+
+# data["MSZoning_num"] = text2num(data["MSZoning"])
+# data["Street_num"]= text2num(data["Street"])
+# data["LotShape_num"] = text2num(data["LotShape"])
+# data["LandContour_num"] = text2num(data["LandContour"])
+# data["Utilities_num"]= text2num(data["Utilities"])
+# data["LotConfig_num"] = text2num(data["LotConfig"])
+# data["LandSlope_num"] = text2num(data["LandSlope"])
+# data["Neighborhood_num"] = text2num(data["Neighborhood"])
+# data["Condition2_num"] = text2num(data["Condition2"])
+# data["BldgType_num"] = text2num(data["BldgType"])
+# data["RoofStyle_num"] = text2num(data["RoofStyle"])
+# data["Exterior1st_num"] = text2num(data["Exterior1st"])
+# data["ExterCond_num"] = text2num(data["ExterCond"])
+# data["Foundation_num"] = text2num(data["Foundation"])
+# #BsmtFinType2_num = text2num(ori_data["BsmtFinType2"])
+# data["HeatingQC_num"] = text2num(data["HeatingQC"])
+# data["Electrical_num"] = text2num(data["Electrical"])
+# data["KitchenQual_num"] = text2num(data["KitchenQual"])
+# data["PavedDrive_num"] = text2num(data["PavedDrive"])
+# data["SaleType_num"] = text2num(data["SaleType"])
+# data["SaleCondition_num"] = text2num(data["SaleCondition"])
+
+# HeatingQC_num[90:110]
+
+# In[11]:
+
+
+cols_text = ["SalePrice", "OverallQual", "GrLivArea", "GarageCars", "TotalBsmtSF", "FullBath","YearBuilt","MSZoning","LandContour","LotConfig","Neighborhood","Condition2","BldgType","RoofStyle","ExterCond","Foundation","HeatingQC","Electrical","KitchenQual","PavedDrive","SaleType","SaleCondition"]
+
+
+# In[12]:
+
+
+data_copy = ori_data[cols_text].copy()
+
+
+# In[13]:
+
+
+"""
+size_mapping = {'XL':3, 'L':2, 'M':1}
+df['size'] = df['size'].map(size_mapping)
+"""
+mszoning_mapping = {'A':0, 'C':1, 'FV':2, 'I':3, 'RH':4, 'RL':5, 'RP':6, 'RM':7}
+data_copy["MSZoning"] = data_copy["MSZoning"].map(mszoning_mapping)
+LandContour_mapping = {'Lvl':0, 'Bnk':1, 'HLS':2, 'Low':3}
+data_copy["LandContour"] = data_copy["LandContour"].map(LandContour_mapping)
+LotConfig_mapping = {'Inside':0, 'Corner':1, 'CulDSac':2, 'FR2':3, 'FR3':4}
+data_copy["LotConfig"] = data_copy["LotConfig"].map(LotConfig_mapping)
+Neighborhood_mapping = {'Blmngtn':0, 'Blueste':1,'BrDale':2, 'BrkSide':3,'ClearCr':4,'CollgCr':5,'Crawfor':6,
+                       'Edwards':7,'Gilbert':8,'IDOTRR':9,'MeadowV':10,'Mitchel':11,'NAmes':12,'NoRidge':13,
+                       'NPkVill':14,'NridgHt':15,'NWAmes':16,'OldTown':17,'SWISU':18,'Sawyer':19,'SawyerW':20,
+                       'Somerst':21,'StoneBr':22,'Timber':23,'Veenker':24}
+data_copy["Neighborhood"] = data_copy["Neighborhood"].map(Neighborhood_mapping)
+Condition2_mnapping = {'Artery':0,'Feedr':1,'Norm':2,'RRNn':3,'RRAn':4,'PosN':5,'PosA':6,'RRNe':7,'RRAe':8}
+data_copy["Condition2"] = data_copy["Condition2"].map(Condition2_mnapping)
+BldgType_mnapping = {'1Fam':0,'2fmCon':1,'Duplex':2,'TwnhsE':3,'Twnhs':4}
+data_copy["BldgType"] = data_copy["BldgType"].map(BldgType_mnapping)
+RoofStyle_mnapping = {'Flat':0,'Gable':1,'Gambrel':2,'Hip':3,'Mansard':4,'Shed':5}
+data_copy["RoofStyle"] = data_copy["RoofStyle"].map(RoofStyle_mnapping)
+ExterCond_mnapping = {'Ex':0,'Gd':1,'TA':2,'Fa':3,'Po':4}
+data_copy["ExterCond"] = data_copy["ExterCond"].map(ExterCond_mnapping)
+Foundation_mnapping = {'BrkTil':0,'CBlock':1,'PConc':2,'Slab':3,'Stone':4,'Wood':5}
+data_copy["Foundation"] = data_copy["Foundation"].map(Foundation_mnapping)
+data_copy["HeatingQC"] = data_copy["HeatingQC"].map(ExterCond_mnapping)
+Electrical_mnapping = {'SBrkr':0,'FuseA':1,'FuseF':2,'FuseP':3,'Mix':4}
+data_copy["Electrical"] = data_copy["Electrical"].map(Electrical_mnapping)
+data_copy["KitchenQual"] = data_copy["KitchenQual"].map(ExterCond_mnapping)
+PavedDrive_mnapping = {'Y':0,'P':1,'N':2}
+data_copy["PavedDrive"] = data_copy["PavedDrive"].map(PavedDrive_mnapping)
+SaleType_mnapping = {'WD':0,'CWD':1,'VWD':2,'New':3,'COD':4,'Con':5,'ConLw':6,'ConLI':7,'ConLD':8,'Oth':9}
+data_copy["SaleType"] = data_copy["SaleType"].map(SaleType_mnapping)
+SaleCondition_mnapping = {'Normal':0,'Abnorml':1,'AdjLand':2,'Alloca':3,'Family':4,'Partial':5}
+data_copy["SaleCondition"] = data_copy["SaleCondition"].map(SaleCondition_mnapping)
+
+
+# In[14]:
+
+
+#missing data
+total = data_copy.isnull().sum().sort_values(ascending=False)
+percent = (data_copy.isnull().sum()/data_copy.isnull().count()).sort_values(ascending=False)
+missing_data = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
+missing_data.head(-1)
+
+
+# In[15]:
+
+
+corr_matrix = data_copy.corr()
+corr_matrix['SalePrice'].sort_values(ascending = False)
+
+
+# In[48]:
+
+
+cols_train =  ["OverallQual", "GrLivArea", "GarageCars", "TotalBsmtSF", "FullBath","YearBuilt",'HeatingQC',"KitchenQual","Foundation","SaleCondition","RoofStyle","Neighborhood","SaleType","BldgType","PavedDrive"]
+
+
+# In[49]:
+
+
+#saleprice correlation matrix
+#correlation matrix
+corrmat = data_copy.corr()
+f, ax = plt.subplots(figsize=(12, 9))
+sns.heatmap(corrmat, vmax=.8, square=True);
+k = 27 #number of variables for heatmap
+cols = corrmat.nlargest(k, 'SalePrice')['SalePrice'].index
+cm = np.corrcoef(data_copy[cols].values.T)
+sns.set(font_scale=1.25)
+hm = sns.heatmap(cm, cbar=True, annot=True, square=True, fmt='.2f', annot_kws={'size': 10}, yticklabels=cols.values, xticklabels=cols.values)
+plt.show()
+
+
+# In[102]:
+
+
+plt.scatter(data_copy.GrLivArea, data_copy.SalePrice, c = "blue", marker = "s")
+plt.title("Looking for outliers")
+plt.xlabel("GrLivArea")
+plt.ylabel("SalePrice")
+plt.show()
+data_copy = data_copy[data_copy.GrLivArea < 4000]
+
+
+# In[104]:
+
+
+plt.scatter(data_copy.GarageCars, data_copy.SalePrice, c = "blue", marker = "s")
+plt.title("Looking for outliers")
+plt.xlabel("GarageCars")
+plt.ylabel("SalePrice")
+plt.show()
+
+
+# In[105]:
+
+
+data_train = data_copy[cols_train].copy()
+data_labels = data_copy["SalePrice"]
+
+
+# In[153]:
+
+
+# Define error measure for official scoring : RMSE
+scorer = make_scorer(mean_squared_error, greater_is_better = False)
+
+def rmse_cv_train(model):
+    rmse= np.sqrt(-cross_val_score(model, X_train, y_train, scoring = scorer, cv = 10))
+    return(rmse)
+
+def rmse_cv_test(model):
+    rmse= np.sqrt(-cross_val_score(model, X_test, y_test, scoring = scorer, cv = 10))
+    return(rmse)
+
+
+# In[154]:
+
+
+X_train,X_test,y_train,y_test = train_test_split(data_train,data_labels,test_size = 0.2,random_state = 123)
+
+
+# In[155]:
+
+
+#establish model
+from sklearn.ensemble import RandomForestRegressor
+pipeline = make_pipeline(
+    preprocessing.StandardScaler(),
+    RandomForestRegressor(random_state = 123,n_jobs  = -1,max_features = 'sqrt')
+)
+pipeline.get_params().keys()
+
+
+# In[156]:
+
+
+hyperparameters = {
+                    'randomforestregressor__max_depth':[16,15,14,13],
+                    'randomforestregressor__n_estimators':[95,96,97,99,98]
+                  }
+
+
+# In[157]:
+
+
+clf = GridSearchCV(pipeline, hyperparameters, cv=10)
+clf.fit(X_train,y_train)
+
+
+# In[158]:
+
+
+clf.best_params_
+
+
+# In[159]:
+
+
+clf.best_score_
+
+
+# In[162]:
+
+
+print("Ridge RMSE on Training set :", rmse_cv_train(clf).mean())
+print("Ridge RMSE on Test set :", rmse_cv_test(clf).mean())
+
+
+# In[130]:
+
+
+y_pred = clf.predict(X_test)
+
+
+# In[131]:
+
+
+mean_squared_log_error(y_pred,y_test)
+
+
+# In[132]:
+
+
+y_pred1 = clf.predict(X_train)
+
+
+# In[133]:
+
+
+mean_squared_log_error(y_train,y_pred1)
+
+
+# In[134]:
+
+
+joblib.dump(clf,"VestySh2.pkl")
+
+
+# In[135]:
+
+
+test = pd.read_csv("test.csv")
+
+
+# In[136]:
+
+
+data_test = test[cols_train].copy()
+data_test.shape
+
+
+# In[137]:
+
+
+#missing data
+total = data_test.isnull().sum().sort_values(ascending=False)
+percent = (data_test.isnull().sum()/data_test.isnull().count()).sort_values(ascending=False)
+missing_data = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
+missing_data.head(9)
+
+
+# In[33]:
+
+
+
+ExterCond_mnapping = {'Ex':0,'Gd':1,'TA':2,'Fa':3,'Po':4,'NA':2}
+
+Foundation_mnapping = {'BrkTil':0,'CBlock':1,'PConc':2,'Slab':3,'Stone':4,'Wood':5,'NA':2}
+data_test["Foundation"] = data_test["Foundation"].map(Foundation_mnapping)
+data_test["HeatingQC"] = data_test["HeatingQC"].map(ExterCond_mnapping)
+data_test["KitchenQual"] = data_test["KitchenQual"].map(ExterCond_mnapping)
+
+
+# In[34]:
+
+
+data_test["KitchenQual"][95] = 2
+TBSF_median = data_test["TotalBsmtSF"].median()
+data_test["TotalBsmtSF"][660] = TBSF_median
+GC_median = data_test["GarageCars"].median()
+data_test["GarageCars"][1116] = GC_median
+
+
+# In[35]:
+
+
+#missing data
+total = data_test.isnull().sum().sort_values(ascending=False)
+percent = (data_test.isnull().sum()/data_test.isnull().count()).sort_values(ascending=False)
+missing_data = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
+missing_data.head(9)
+
+
+# In[36]:
+
+
+predicts = clf.predict(data_test)
+
+
+# In[37]:
+
+
+dataframe = pd.DataFrame({'SalePrice':predicts})
+dataframe.to_csv("result.csv",index = False,sep = " ")
+
+
+# In[138]:
+
+
+#establish model
+from sklearn.svm import SVR
+from sklearn.model_selection import RandomizedSearchCV
+from scipy.stats import randint
+from scipy.stats import expon, reciprocal
+scaler = preprocessing.StandardScaler().fit(X_train)
+X_train_scaler = scaler.transform(X_train)
+X_test_scaler = scaler.transform(X_test)
+
+
+# In[145]:
+
+
+svr_reg = SVR(kernel='linear')
+hyperparameters2 = {
+    'epsilon':randint(0.01,1.1),
+    'C':randint(130,140),
+    'gamma': expon(scale=1.0)
+                  }
+#svr_reg.get_params().keys()
+clf2 = RandomizedSearchCV(svr_reg, param_distributions=hyperparameters2, cv=10,n_iter=100,n_jobs =-1)
+clf2.fit(X_train_scaler,y_train)
+
+
+# In[146]:
+
+
+clf2.best_params_
+
+
+# In[147]:
+
+
+y_pred2 = clf2.predict(X_test_scaler)
+
+
+# In[148]:
+
+
+mean_squared_log_error(y_pred2,y_test)
+
+
+# In[149]:
+
+
+y_pred3 = clf2.predict(X_train_scaler)
+
+
+# In[150]:
+
+
+mean_squared_log_error(y_pred3,y_train)
+
+
+# In[45]:
+
+
+data_test_scaler = scaler.transform(data_test)
+
+
+# In[46]:
+
+
+predicts = clf2.predict(data_test_scaler)
+
+
+# In[47]:
+
+
+dataframe = pd.DataFrame({'SalePrice':predicts})
+dataframe.to_csv("result.csv",index = False,sep = " ")
+
